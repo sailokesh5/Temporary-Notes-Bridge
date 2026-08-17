@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Temporary Notes Bridge</title>
+
+<style>
+    :root {
+        --bg: #111318;
+        --card: #1b1e26;
+        --border: #2a2e38;
+        --accent: #5b8def;
+        --text: #e8e9ed;
+        --muted: #8b8f9a;
+        --danger: #e05252;
+        --ok: #3fbf7f;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+        max-width: 720px;
+        margin: 0 auto;
+        padding: 20px;
+        background: var(--bg);
+        color: var(--text);
+    }
+
+    h1 {
+        text-align: center;
+        font-size: 22px;
+        margin-bottom: 4px;
+    }
+
+    .subtitle {
+        text-align: center;
+        color: var(--muted);
+        font-size: 13px;
+        margin-bottom: 20px;
+    }
+
+    .upload-area {
+        border: 2px dashed var(--border);
+        padding: 30px 20px;
+        text-align: center;
+        border-radius: 14px;
+        margin-top: 10px;
+        background: var(--card);
+        transition: border-color 0.15s ease;
+    }
+
+    .upload-area.drag-over {
+        border-color: var(--accent);
+    }
+
+    .upload-area p {
+        color: var(--muted);
+        font-size: 14px;
+        margin: 6px 0;
+    }
+
+    .paste-hint {
+        display: inline-block;
+        background: #262a34;
+        padding: 3px 10px;
+        border-radius: 6px;
+        font-size: 13px;
+        margin-top: 8px;
+    }
+
+    #pasteZone {
+        outline: none;
+        border: 2px solid var(--border);
+        border-radius: 10px;
+        padding: 14px;
+        margin-top: 14px;
+        color: var(--muted);
+        font-size: 13px;
+        cursor: text;
+        min-height: 20px;
+    }
+
+    #pasteZone:focus {
+        border-color: var(--accent);
+        color: var(--text);
+        background: #1a1d24;
+    }
+
+    #pasteZone.ready {
+        border-color: var(--ok);
+    }
+
+    input[type="file"] {
+        color: var(--muted);
+        margin-top: 10px;
+    }
+
+    button {
+        padding: 9px 16px;
+        margin: 8px 6px 0 0;
+        cursor: pointer;
+        border: none;
+        border-radius: 8px;
+        background: var(--accent);
+        color: white;
+        font-size: 14px;
+        font-weight: 500;
+    }
+
+    button.secondary {
+        background: #2a2e38;
+        color: var(--text);
+    }
+
+    button.danger {
+        background: var(--danger);
+    }
+
+    button:active {
+        opacity: 0.8;
+    }
+
+    #status {
+        color: var(--muted);
+        font-size: 13px;
+        min-height: 18px;
+    }
+
+    h2 {
+        font-size: 16px;
+        margin-top: 30px;
+        color: var(--text);
+    }
+
+    .image-card {
+        margin-top: 16px;
+        padding: 16px;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        background: var(--card);
+    }
+
+    .temporary-image {
+        width: 100%;
+        border-radius: 8px;
+        display: block;
+        margin-top: 10px;
+        cursor: pointer;
+    }
+
+    .filename {
+        font-weight: 600;
+        font-size: 13px;
+        word-break: break-word;
+        color: var(--text);
+    }
+
+    .expiry {
+        font-size: 12px;
+        color: var(--muted);
+        margin-top: 2px;
+    }
+
+    .expiry.soon {
+        color: var(--danger);
+    }
+
+    .button-row {
+        margin-top: 10px;
+    }
+
+    #emptyState {
+        color: var(--muted);
+        text-align: center;
+        padding: 30px 0;
+        font-size: 14px;
+    }
+
+    .toast {
+        position: fixed;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: var(--ok);
+        color: white;
+        padding: 10px 20px;
+        border-radius: 8px;
+        font-size: 14px;
+        opacity: 0;
+        transition: opacity 0.2s ease;
+        pointer-events: none;
+        z-index: 100;
+    }
+
+    .toast.show {
+        opacity: 1;
+    }
+</style>
+</head>
+
+<body>
+
+<h1>Temporary Notes Bridge</h1>
+<p class="subtitle">Screenshots disappear on their own — no clutter left behind.</p>
+
+<div class="upload-area" id="uploadArea">
+    <p><strong>Paste a screenshot</strong></p>
+    <p>or drag an image in, or pick one below</p>
+
+    <div id="pasteZone" contenteditable="true" tabindex="0">
+        Click here, then press Ctrl+V
+    </div>
+
+    <br>
+    <input type="file" id="imageInput" accept="image/*">
+    <br>
+    <button id="uploadButton">Send</button>
+    <p id="status"></p>
+</div>
+
+<h2>Temporary Images</h2>
+<p class="expiry" id="listStatus">Checking...</p>
+
+<div id="temporaryImages"></div>
+<div id="emptyState" style="display:none;">Nothing here yet.</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+
+const imageInput = document.getElementById("imageInput");
+const uploadButton = document.getElementById("uploadButton");
+const statusEl = document.getElementById("status");
+const temporaryImages = document.getElementById("temporaryImages");
+const emptyState = document.getElementById("emptyState");
+const uploadArea = document.getElementById("uploadArea");
+const toast = document.getElementById("toast");
+const pasteZone = document.getElementById("pasteZone");
+const listStatus = document.getElementById("listStatus");
+
+let currentImages = []; // last known list, for countdown re-render without refetch
+
+function showToast(message) {
+    toast.textContent = message;
+    toast.classList.add("show");
+    setTimeout(() => toast.classList.remove("show"), 1800);
+}
+
+// =========================================
+// UPLOAD (shared by file picker, paste, drop)
+// =========================================
+
+async function uploadFile(file) {
+    if (!file) return;
+
+    const formData = new FormData();
+    // Give pasted images (which often have no filename) a real name
+    const name = file.name && file.name !== "image.png"
+        ? file.name
+        : `screenshot-${Date.now()}.png`;
+    formData.append("image", file, name);
+
+    statusEl.textContent = "Uploading...";
+
+    try {
+        const response = await fetch("/upload", { method: "POST", body: formData, cache: "no-store" });
+        const result = await response.json();
+
+        if (result.success) {
+            statusEl.textContent = "Sent.";
+            showToast("Image sent");
+            loadImages();
+        } else {
+            statusEl.textContent = "Upload failed: " + result.message;
+        }
+    } catch (error) {
+        statusEl.textContent = "Could not connect to server.";
+    }
+}
+
+uploadButton.addEventListener("click", () => uploadFile(imageInput.files[0]));
+
+// =========================================
+// PASTE FROM CLIPBOARD
+// =========================================
+// The 'paste' event only fires on whatever element currently has
+// keyboard focus. A plain <div> can't receive focus or paste events,
+// so we use a small always-focused contenteditable box instead, and
+// re-focus it any time the page or upload area is clicked.
+
+function handlePasteEvent(event) {
+    const items = event.clipboardData?.items;
+    if (!items) return;
+
+    for (const item of items) {
+        if (item.type.startsWith("image/")) {
+            const file = item.getAsFile();
+            uploadFile(file);
+            event.preventDefault();
+            pasteZone.textContent = "Click here, then press Ctrl+V";
+            break;
+        }
+    }
+}
+
+pasteZone.addEventListener("paste", handlePasteEvent);
+
+pasteZone.addEventListener("focus", () => {
+    pasteZone.classList.add("ready");
+    pasteZone.textContent = "Ready — press Ctrl+V now";
+});
+
+pasteZone.addEventListener("blur", () => {
+    pasteZone.classList.remove("ready");
+    pasteZone.textContent = "Click here, then press Ctrl+V";
+});
+
+// Keep it focused whenever the user clicks anywhere in the upload box
+uploadArea.addEventListener("click", () => pasteZone.focus());
+
+// Auto-focus on page load so the very first paste works immediately
+window.addEventListener("load", () => pasteZone.focus());
+
+// =========================================
+// DRAG & DROP
+// =========================================
+
+uploadArea.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    uploadArea.classList.add("drag-over");
+});
+
+uploadArea.addEventListener("dragleave", () => {
+    uploadArea.classList.remove("drag-over");
+});
+
+uploadArea.addEventListener("drop", (e) => {
+    e.preventDefault();
+    uploadArea.classList.remove("drag-over");
+    const file = e.dataTransfer.files[0];
+    if (file && file.type.startsWith("image/")) {
+        uploadFile(file);
+    }
+});
+
+// =========================================
+// EXPIRY FORMATTING
+// =========================================
+
+function formatTimeLeft(expiresAtISO) {
+    if (!expiresAtISO) return { text: "", soon: false };
+
+    const msLeft = new Date(expiresAtISO).getTime() - Date.now();
+
+    if (msLeft <= 0) return { text: "Expiring...", soon: true };
+
+    const totalMinutes = Math.floor(msLeft / 60000);
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+
+    const text = hours > 0
+        ? `Expires in ${hours}h ${minutes}m`
+        : `Expires in ${minutes}m`;
+
+    return { text, soon: totalMinutes < 15 };
+}
+
+// =========================================
+// LOAD IMAGES (polls automatically)
+// =========================================
+
+async function loadImages() {
+    try {
+        const response = await fetch("/api/images?t=" + Date.now(), { cache: "no-store" });
+        const data = await response.json();
+
+        if (!data.success || !Array.isArray(data.images)) {
+            listStatus.textContent = "Server responded but data looked wrong.";
+            return;
+        }
+
+        currentImages = data.images;
+        renderImages();
+
+        const now = new Date().toLocaleTimeString();
+        listStatus.textContent = `Last checked ${now} · ${currentImages.length} image(s) on server`;
+    } catch (error) {
+        console.error(error);
+        listStatus.textContent = "Can't reach the server — check you're on the same WiFi and the laptop server is running.";
+    }
+}
+
+function renderImages() {
+    temporaryImages.innerHTML = "";
+
+    if (currentImages.length === 0) {
+        emptyState.style.display = "block";
+        return;
+    }
+    emptyState.style.display = "none";
+
+    for (const item of currentImages) {
+        createImageCard(item);
+    }
+}
+
+// =========================================
+// CREATE IMAGE CARD
+// =========================================
+
+function createImageCard(item) {
+    const filename = item.filename;
+    // cache-buster (?v=addedAt) so Safari can't serve a stale/missing image for a reused filename
+    const cacheBuster = item.added_at ? encodeURIComponent(item.added_at) : Date.now();
+    const imageURL = window.location.origin + "/images/" + encodeURIComponent(filename) + "?v=" + cacheBuster;
+
+    const card = document.createElement("div");
+    card.className = "image-card";
+
+    const name = document.createElement("p");
+    name.className = "filename";
+    name.textContent = filename;
+    card.appendChild(name);
+
+    const expiryEl = document.createElement("p");
+    const { text, soon } = formatTimeLeft(item.expires_at);
+    expiryEl.className = "expiry" + (soon ? " soon" : "");
+    expiryEl.textContent = text;
+    card.appendChild(expiryEl);
+
+    const image = document.createElement("img");
+    image.className = "temporary-image";
+    image.src = imageURL;
+    image.alt = filename;
+    image.addEventListener("click", () => window.open(imageURL, "_blank"));
+    card.appendChild(image);
+
+    const buttonRow = document.createElement("div");
+    buttonRow.className = "button-row";
+
+    // ---- COPY: fetches the image and puts it on the clipboard ----
+    const copyButton = document.createElement("button");
+    copyButton.className = "secondary";
+    copyButton.textContent = "Copy";
+    copyButton.addEventListener("click", async () => {
+        try {
+            const response = await fetch(imageURL, { cache: "no-store" });
+            const blob = await response.blob();
+            // iOS/Safari clipboard write needs a PNG blob
+            const pngBlob = blob.type === "image/png" ? blob : await toPng(blob);
+            await navigator.clipboard.write([
+                new ClipboardItem({ [pngBlob.type]: pngBlob })
+            ]);
+            showToast("Copied to clipboard");
+        } catch (error) {
+            showToast("Copy not supported — tap Save instead");
+        }
+    });
+    buttonRow.appendChild(copyButton);
+
+    // ---- SAVE: opens full image so it can be long-pressed → Save to Photos ----
+    const saveButton = document.createElement("button");
+    saveButton.className = "secondary";
+    saveButton.textContent = "Save";
+    saveButton.addEventListener("click", () => {
+        window.open(imageURL, "_blank");
+        showToast("Long-press the image to save");
+    });
+    buttonRow.appendChild(saveButton);
+
+    // ---- DELETE ----
+    const deleteButton = document.createElement("button");
+    deleteButton.className = "danger";
+    deleteButton.textContent = "Delete";
+    deleteButton.addEventListener("click", async () => {
+        const response = await fetch("/api/images/" + encodeURIComponent(filename), { method: "DELETE", cache: "no-store" });
+        const result = await response.json();
+        if (result.success) {
+            card.remove();
+            currentImages = currentImages.filter(i => i.filename !== filename);
+            if (currentImages.length === 0) emptyState.style.display = "block";
+        } else {
+            showToast("Delete failed");
+        }
+    });
+    buttonRow.appendChild(deleteButton);
+
+    card.appendChild(buttonRow);
+    temporaryImages.appendChild(card);
+}
+
+// Convert non-PNG blobs to PNG via canvas, for clipboard compatibility
+function toPng(blob) {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => {
+            const canvas = document.createElement("canvas");
+            canvas.width = img.width;
+            canvas.height = img.height;
+            canvas.getContext("2d").drawImage(img, 0, 0);
+            canvas.toBlob((pngBlob) => {
+                pngBlob ? resolve(pngBlob) : reject();
+            }, "image/png");
+        };
+        img.onerror = reject;
+        img.src = URL.createObjectURL(blob);
+    });
+}
+
+// =========================================
+// INITIAL LOAD + POLLING
+// =========================================
+
+loadImages();
+setInterval(loadImages, 4000);       // pick up new images automatically (e.g. on iPad)
+setInterval(renderImages, 30000);    // refresh countdown text without refetching
+
+</script>
+
+</body>
+</html>

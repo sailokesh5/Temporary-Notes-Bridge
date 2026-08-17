@@ -1,0 +1,7 @@
+.venv/
+__pycache__/
+*.pyc
+
+# runtime data — keep the folder, ignore its contents
+temp_images/*
+!temp_images/.gitkeep
