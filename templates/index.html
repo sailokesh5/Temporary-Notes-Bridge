@@ -270,6 +270,7 @@ async function uploadFile(file) {
 
         if (result.success) {
             statusEl.textContent = "Sent.";
+            imageInput.value = "";
             showToast("Image sent");
             loadImages();
         } else {
@@ -434,41 +435,16 @@ function createImageCard(item) {
     image.className = "temporary-image";
     image.src = imageURL;
     image.alt = filename;
-    image.addEventListener("click", () => window.open(imageURL, "_blank"));
     card.appendChild(image);
+
+    const hint = document.createElement("p");
+    hint.className = "expiry";
+    hint.style.marginTop = "8px";
+    hint.textContent = "Press and hold the photo above to Copy or Save";
+    card.appendChild(hint);
 
     const buttonRow = document.createElement("div");
     buttonRow.className = "button-row";
-
-    // ---- COPY: fetches the image and puts it on the clipboard ----
-    const copyButton = document.createElement("button");
-    copyButton.className = "secondary";
-    copyButton.textContent = "Copy";
-    copyButton.addEventListener("click", async () => {
-        try {
-            const response = await fetch(imageURL, { cache: "no-store" });
-            const blob = await response.blob();
-            // iOS/Safari clipboard write needs a PNG blob
-            const pngBlob = blob.type === "image/png" ? blob : await toPng(blob);
-            await navigator.clipboard.write([
-                new ClipboardItem({ [pngBlob.type]: pngBlob })
-            ]);
-            showToast("Copied to clipboard");
-        } catch (error) {
-            showToast("Copy not supported — tap Save instead");
-        }
-    });
-    buttonRow.appendChild(copyButton);
-
-    // ---- SAVE: opens full image so it can be long-pressed → Save to Photos ----
-    const saveButton = document.createElement("button");
-    saveButton.className = "secondary";
-    saveButton.textContent = "Save";
-    saveButton.addEventListener("click", () => {
-        window.open(imageURL, "_blank");
-        showToast("Long-press the image to save");
-    });
-    buttonRow.appendChild(saveButton);
 
     // ---- DELETE ----
     const deleteButton = document.createElement("button");
@@ -489,24 +465,6 @@ function createImageCard(item) {
 
     card.appendChild(buttonRow);
     temporaryImages.appendChild(card);
-}
-
-// Convert non-PNG blobs to PNG via canvas, for clipboard compatibility
-function toPng(blob) {
-    return new Promise((resolve, reject) => {
-        const img = new Image();
-        img.onload = () => {
-            const canvas = document.createElement("canvas");
-            canvas.width = img.width;
-            canvas.height = img.height;
-            canvas.getContext("2d").drawImage(img, 0, 0);
-            canvas.toBlob((pngBlob) => {
-                pngBlob ? resolve(pngBlob) : reject();
-            }, "image/png");
-        };
-        img.onerror = reject;
-        img.src = URL.createObjectURL(blob);
-    });
 }
 
 // =========================================

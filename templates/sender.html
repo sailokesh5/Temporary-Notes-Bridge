@@ -160,6 +160,35 @@
         font-size: 14px;
     }
 
+    .qr-card {
+        text-align: center;
+        padding: 20px;
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        background: var(--card);
+        margin-bottom: 24px;
+    }
+
+    .qr-card h2 {
+        margin-top: 0;
+        font-size: 15px;
+    }
+
+    #qrcode {
+        display: inline-block;
+        background: white;
+        padding: 10px;
+        border-radius: 10px;
+        margin: 10px 0;
+    }
+
+    #lanUrlText {
+        font-family: monospace;
+        font-size: 13px;
+        color: var(--muted);
+        word-break: break-all;
+    }
+
     .toast {
         position: fixed;
         bottom: 20px;
@@ -180,12 +209,20 @@
         opacity: 1;
     }
 </style>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </head>
 
 <body>
 
 <h1>Temporary Notes Bridge</h1>
 <p class="subtitle">Send a screenshot — it'll show up on your iPad in seconds.</p>
+
+<div class="qr-card">
+    <h2>Open on your iPad</h2>
+    <div id="qrcode"></div>
+    <p id="lanUrlText">Loading address...</p>
+</div>
 
 <div class="upload-area" id="uploadArea">
     <p><strong>Paste a screenshot</strong></p>
@@ -231,6 +268,30 @@ function showToast(message) {
 }
 
 // =========================================
+// QR CODE — lets the iPad scan its way in instead of typing the IP
+// =========================================
+
+async function loadQrCode() {
+    try {
+        const response = await fetch("/api/lan-info", { cache: "no-store" });
+        const data = await response.json();
+
+        document.getElementById("lanUrlText").textContent = data.url;
+
+        new QRCode(document.getElementById("qrcode"), {
+            text: data.url,
+            width: 160,
+            height: 160
+        });
+    } catch (error) {
+        document.getElementById("lanUrlText").textContent =
+            "Could not determine network address.";
+    }
+}
+
+loadQrCode();
+
+// =========================================
 // UPLOAD (shared by file picker, paste, drop)
 // =========================================
 
@@ -251,6 +312,7 @@ async function uploadFile(file) {
 
         if (result.success) {
             statusEl.textContent = "Sent.";
+            imageInput.value = "";
             showToast("Image sent");
             loadImages();
         } else {

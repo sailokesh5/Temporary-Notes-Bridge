@@ -1,5 +1,6 @@
 import threading
 import time
+import socket
 
 from flask import Flask, render_template, request, jsonify, send_from_directory
 
@@ -31,6 +32,25 @@ cleanup_thread = threading.Thread(target=run_cleanup_loop, daemon=True)
 cleanup_thread.start()
 
 
+def get_local_ip():
+    """Finds this machine's LAN IP address (the one other devices on the
+    same WiFi use to reach it) without needing any external service."""
+
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+    try:
+        # Doesn't actually send any data — just asks the OS which local
+        # network interface would be used to reach an outside address.
+        sock.connect(("8.8.8.8", 80))
+        ip = sock.getsockname()[0]
+    except Exception:
+        ip = "127.0.0.1"
+    finally:
+        sock.close()
+
+    return ip
+
+
 @app.after_request
 def add_no_cache_headers(response):
     """iOS Safari aggressively caches fetch() responses and images.
@@ -50,6 +70,16 @@ def home():
         return render_template("sender.html")
 
     return render_template("index.html")
+
+
+@app.route("/api/lan-info")
+def lan_info():
+    """Tells the sender page its own LAN address, so it can render
+    a QR code the iPad can scan instead of typing the IP by hand."""
+    lan_ip = get_local_ip()
+    return jsonify({
+        "url": f"http://{lan_ip}:5000"
+    })
 
 
 @app.route("/api/images")
