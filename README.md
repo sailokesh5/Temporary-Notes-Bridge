@@ -108,11 +108,3 @@ EXPIRATION_HOURS = 5   # how long an image survives before auto-deletion
 The server will now start invisibly on every login. To stop it, open Task Manager and end the `pythonw.exe` process.
 
 ---
-
-### Resume bullet points (pick 2–3)
-
-- Built a full-stack local network utility (Flask + vanilla JS) enabling real-time image transfer between devices with automatic time-based expiration, using a background worker thread for cleanup and a flat-file metadata store for state
-- Implemented request-origin-based view routing, serving distinct interfaces from a single Flask endpoint depending on whether the client is the host device (loopback) or a remote device on the LAN
-- Added a self-discovering QR code connection flow, using a socket-based LAN IP lookup (no external service dependency) surfaced through a small API endpoint and rendered client-side
-- Diagnosed and resolved a mobile Safari caching bug causing stale data across polling clients, by implementing HTTP cache-control headers and client-side cache-busting
-- Designed a RESTful API with upload, list, delete, and file-serving endpoints, consumed by a vanilla JS frontend using the Clipboard and Fetch APIs
